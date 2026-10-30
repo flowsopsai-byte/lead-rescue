@@ -47,6 +47,9 @@ flowchart LR
 
 ### Workflows
 
+![WF1 — Missed call](docs/screenshots/Wf-1.png)
+![WF2 — Qualification](docs/screenshots/Wf-2.png)
+
 - **[`n8n/wf1-missed-call.json`](n8n/wf1-missed-call.json)** — missed call → client lookup → 24h dedup → landline detection → SMS → push alert → 1h wait → follow-up SMS.
 - **[`n8n/wf2-qualification.json`](n8n/wf2-qualification.json)** — chat answers → load call → AI summary & score → HubSpot → save qualification → push alert.
 
