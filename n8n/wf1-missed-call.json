@@ -1,0 +1,581 @@
+{
+  "name": "Lead Rescue — WF1 Missed call",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const b = $('Webhook').first().json.body;\nconst client = $('Get client').first().json;\nconst caller = b.From;\n\n// Doublon : même appelant déjà traité dans les dernières 24h\nconst recent = $('Check doublon').all().some(i => i.json.id);\nif (recent) return [];\n\n// Fixe français = pas de SMS possible\nconst isLandline = caller.startsWith('+33') && !/^\\+33[67]/.test(caller);\n\nconst token = Array.from({ length: 12 }, () => Math.floor(Math.random() * 16).toString(16)).join('');\nconst lien = `https://typebot.co/lead-rescue-l0avpfn?t=${token}`;\n\nconst sms = client.sms_template\n  .replaceAll('{entreprise}', client.name)\n  .replaceAll('{lien}', lien);\n\nreturn [{\n  json: {\n    client_id: client.id,\n    caller_phone: caller,\n    is_landline: isLandline,\n    status: isLandline ? 'landline' : 'missed',\n    token,\n    lien,\n    sms\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        -240
+      ],
+      "id": "8a6c9a4a-9cd0-4a43-a378-e917152543ae",
+      "name": "Préparer le lead"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-rescue-missed-call",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -464,
+        -240
+      ],
+      "id": "59b54988-a709-43c6-a499-c9313dfcb3b5",
+      "name": "Webhook",
+      "webhookId": "00000000-0000-0000-0000-000000000001"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response>\n  <Play>https://art.flowsopsai.com/audio/garage-dupont.mp3</Play>\n  <Hangup/>\n</Response>",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -240,
+        -240
+      ],
+      "id": "bb3130c5-dbb0-4ba3-9830-8f495a5b6e57",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "userKey": "YOUR_PUSHOVER_USER_KEY",
+        "message": "={{ $('Envoyer SMS').item.json.messageId ? '📞 Appel manqué — SMS envoyé' : '⚠️ Appel manqué — ÉCHEC SMS' }}\n{{ $('Get client').item.json.name }} · {{ $('Préparer le lead').item.json.caller_phone }}\n{{ new Date().toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' }) }}\n{{ $('Envoyer SMS').item.json.remainingCredits ? 'Crédits restants : ' + $('Envoyer SMS').item.json.remainingCredits : '' }}",
+        "priority": 0,
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.pushover",
+      "typeVersion": 1,
+      "position": [
+        1328,
+        -240
+      ],
+      "id": "20d635a9-fa61-4c24-bd05-f96d052ddbc4",
+      "name": "Lead Rescue",
+      "credentials": {
+        "pushoverApi": {
+          "id": "TaxuGAC46IIY3wPT",
+          "name": "Pushover account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "hours"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1552,
+        -240
+      ],
+      "id": "48503fc3-c061-44e2-b021-dde3f11d2037",
+      "name": "Attendre 1h",
+      "webhookId": "00000000-0000-0000-0000-000000000002"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "dc8cecd9-a3b5-416f-b8ed-30f947a64a6b",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "sms_sent",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "a6d80ff0-3870-4bcd-adbc-f31319c89821",
+              "leftValue": "={{ $('Get client').item.json.relance_enabled }}",
+              "rightValue": "sms_sent",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2000,
+        -240
+      ],
+      "id": "2039f92a-3b8c-42c4-9dce-d3cc7750625a",
+      "name": "Pas de reponse ?",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "clients",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "rescue_number",
+              "keyValue": "={{ $('Webhook').item.json.body.To }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        -240
+      ],
+      "id": "aeb295ed-7681-4b89-a238-389db0bf2050",
+      "name": "Get client",
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f88haHYeRHTtqrr",
+          "name": "Supabase · Lead Rescue"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "calls",
+        "limit": 1,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "client_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Get client').item.json.id }}"
+            },
+            {
+              "keyName": "caller_phone",
+              "condition": "eq",
+              "keyValue": "={{ $('Webhook').item.json.body.From }}"
+            },
+            {
+              "keyName": "called_at",
+              "condition": "gt",
+              "keyValue": "={{ $now.minus({ hours: 24 }).toISO() }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        208,
+        -240
+      ],
+      "id": "a507667f-752b-4e8e-899a-7f7c18d06ada",
+      "name": "Check doublon",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f88haHYeRHTtqrr",
+          "name": "Supabase · Lead Rescue"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "calls",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "client_id",
+              "fieldValue": "={{ $json.client_id }}"
+            },
+            {
+              "fieldId": "caller_phone",
+              "fieldValue": "={{ $json.caller_phone }}"
+            },
+            {
+              "fieldId": "is_landline",
+              "fieldValue": "={{ $json.is_landline }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "token",
+              "fieldValue": "={{ $json.token }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        656,
+        -240
+      ],
+      "id": "0ca86add-f54e-41f7-887d-004c9310be96",
+      "name": "Create call",
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f88haHYeRHTtqrr",
+          "name": "Supabase · Lead Rescue"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.brevo.com/v3/transactionalSMS/sms",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"sender\": \"FlowsOps\",\n  \"recipient\": \"{{ $('Préparer le lead').item.json.caller_phone.replace(/[^0-9]/g,'') }}\",\n  \"content\": \"{{ $('Préparer le lead').item.json.sms }}\",\n  \"type\": \"transactional\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        880,
+        -240
+      ],
+      "id": "41aeb842-6b16-4b1e-8e86-6f96b11d9daf",
+      "name": "Envoyer SMS",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "juW8JbTmYwqKNMry",
+          "name": "api-key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "calls",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $('Create call').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        -240
+      ],
+      "id": "8a39af7b-a676-47b5-a47c-c9a0a772f29f",
+      "name": "Vérifier statut",
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f88haHYeRHTtqrr",
+          "name": "Supabase · Lead Rescue"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "calls",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Create call').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "relance_sent_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2448,
+        -240
+      ],
+      "id": "d7f5da16-f25d-480d-8715-8a70f1b5d82a",
+      "name": "Relance envoyée",
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f88haHYeRHTtqrr",
+          "name": "Supabase · Lead Rescue"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.brevo.com/v3/transactionalSMS/sms",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"sender\": \"FlowsOps\",\n  \"recipient\": \"{{ $('Préparer le lead').item.json.caller_phone.replace(/[^0-9]/g,'') }}\",\n  \"content\": \"{{ $('Get client').item.json.name }} : nous n'avons pas encore votre demande. Décrivez votre besoin ici, on vous rappelle vite : {{ $('Préparer le lead').item.json.lien }}\",\n  \"type\": \"transactional\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2224,
+        -240
+      ],
+      "id": "697c3373-45e1-4ee7-8b1f-2d7d06a219b4",
+      "name": "SMS relance",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "juW8JbTmYwqKNMry",
+          "name": "api-key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "calls",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Create call').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "sms_sent"
+            },
+            {
+              "fieldId": "sms_sent_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        -240
+      ],
+      "id": "dcdeffda-9dbf-4056-9585-c9c468a901e9",
+      "name": "SMS envoyé",
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f88haHYeRHTtqrr",
+          "name": "Supabase · Lead Rescue"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "body": {
+            "To": "+10000000000",
+            "From": "+33600000000",
+            "CallSid": "test-call-001",
+            "CallStatus": "no-answer"
+          }
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Préparer le lead": {
+      "main": [
+        [
+          {
+            "node": "Create call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Rescue": {
+      "main": [
+        [
+          {
+            "node": "Attendre 1h",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attendre 1h": {
+      "main": [
+        [
+          {
+            "node": "Vérifier statut",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pas de reponse ?": {
+      "main": [
+        [
+          {
+            "node": "SMS relance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get client": {
+      "main": [
+        [
+          {
+            "node": "Check doublon",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check doublon": {
+      "main": [
+        [
+          {
+            "node": "Préparer le lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create call": {
+      "main": [
+        [
+          {
+            "node": "Envoyer SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envoyer SMS": {
+      "main": [
+        [
+          {
+            "node": "SMS envoyé",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vérifier statut": {
+      "main": [
+        [
+          {
+            "node": "Pas de reponse ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SMS relance": {
+      "main": [
+        [
+          {
+            "node": "Relance envoyée",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SMS envoyé": {
+      "main": [
+        [
+          {
+            "node": "Lead Rescue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": []
+}
