@@ -1,0 +1,375 @@
+{
+  "name": "Lead Rescue — WF2 Qualification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-rescue-qualification",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        -192
+      ],
+      "id": "a1b40ce5-c4f5-47eb-808b-432fe19b28bd",
+      "name": "Typebot",
+      "webhookId": "00000000-0000-0000-0000-000000000003"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Tu assistes {{ $('Get client').item.json.name }}, un professionnel qui vient de rater un appel.\nVoici les reponses du prospect :\n\nBesoin : {{ $('Typebot').item.json.body.besoin }}\nUrgence : {{ $('Typebot').item.json.body.urgence }}\nZone : {{ $('Typebot').item.json.body.adresse }}\nDisponibilites : {{ $('Typebot').item.json.body.dispo }}\n\nReponds UNIQUEMENT par un objet JSON, sans texte autour, sans balises markdown :\n\n{\n  \"resume\": \"3 phrases max, factuel, ce que le pro doit savoir avant de rappeler\",\n  \"besoin_court\": \"5 mots max\",\n  \"urgence\": \"immediate | cette_semaine | pas_urgent\",\n  \"score\": 1,\n  \"action\": \"la premiere chose a faire, une phrase\"\n}\n\nBareme du score :\n5 = urgence immediate ET adresse fournie\n4 = besoin clair ET disponibilites fournies\n3 = besoin clair, pas de date\n2 = demande vague\n1 = hors sujet ou demarchage",
+        "options": {
+          "systemMessage": "Tu es un assistant de qualification commerciale pour des TPE et PME francophones.\n\nTu produis exclusivement du JSON valide, sans texte avant ni après, sans balises markdown, sans commentaire.\n\nTu es factuel : tu ne reformules jamais en langage commercial, tu ne dramatises pas l'urgence, tu n'inventes aucune information absente des réponses du prospect.\n\nLe professionnel qui te lit est pressé et consulte la fiche sur son téléphone entre deux rendez-vous. Chaque mot doit lui servir à décider s'il rappelle maintenant ou plus tard."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        672,
+        -192
+      ],
+      "id": "e93e09c6-5ae7-436f-aced-417df301da95",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "gpt-4o"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        752,
+        48
+      ],
+      "id": "1a607973-63d9-44a4-9bc6-1859b582c675",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "Zd4OMi6BseWyoMj2",
+          "name": "OpenAI account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.output || '';\nlet ai;\ntry {\n  ai = JSON.parse(raw.replace(/```json|```/g, '').trim());\n} catch (e) {\n  ai = { resume: raw, besoin_court: '', urgence: 'pas_urgent', score: 2, action: 'Rappeler le prospect' };\n}\n\nconst b = $('Typebot').first().json.body;\n\nreturn [{\n  json: {\n    ...ai,\n    urgent: ai.urgence === 'immediate',\n    answers: [\n      { q: 'Besoin', a: b.besoin || '' },\n      { q: 'Urgence', a: b.urgence || '' },\n      { q: 'Adresse', a: b.adresse || '' },\n      { q: 'Disponibilités', a: b.dispo || '' }\n    ]\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        -192
+      ],
+      "id": "45620cbf-9481-4807-aa29-d9fc1293f8e7",
+      "name": "Parser"
+    },
+    {
+      "parameters": {
+        "userKey": "YOUR_PUSHOVER_USER_KEY",
+        "message": "={{ $('Parser').item.json.urgent ? '🔴 URGENT — ' : '✅ ' }}Lead qualifié · {{ $('Get client').item.json.name }}\n{{ $('Parser').item.json.besoin_court }} · score {{ $('Parser').item.json.score }}/5\n📞 {{ $('Charger le lead').item.json.caller_phone }}\n{{ $('Parser').item.json.resume }}\n➡️ {{ $('Parser').item.json.action }}",
+        "priority": 1,
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.pushover",
+      "typeVersion": 1,
+      "position": [
+        1696,
+        -192
+      ],
+      "id": "8cf86d89-83c1-4676-b867-a53c0ad0376c",
+      "name": "Push a message",
+      "credentials": {
+        "pushoverApi": {
+          "id": "TaxuGAC46IIY3wPT",
+          "name": "Pushover account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "email": "={{ $('Typebot').item.json.body.email }}",
+        "additionalFields": {
+          "lastName": "={{ $('Typebot').item.json.body.nom }}",
+          "message": "={{ $('Parser').item.json.resume }}",
+          "phoneNumber": "={{ $('Charger le lead').item.json.caller_phone }}"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        1248,
+        -192
+      ],
+      "id": "434e0248-df95-4ea6-b498-382b4484bff5",
+      "name": "Create or update a contact",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "epF1NPDpZgpWGPc5",
+          "name": "HubSpot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "calls",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "token",
+              "keyValue": "={{ $('Typebot').item.json.body.t }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        224,
+        -192
+      ],
+      "id": "aa798338-d99b-48cb-9954-8ffdc49dc170",
+      "name": "Charger le lead",
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f88haHYeRHTtqrr",
+          "name": "Supabase · Lead Rescue"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "clients",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $('Charger le lead').item.json.client_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        448,
+        -192
+      ],
+      "id": "abfd0b1a-173e-4055-bfe9-ab670d73cd5e",
+      "name": "Get client",
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f88haHYeRHTtqrr",
+          "name": "Supabase · Lead Rescue"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "calls",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Charger le lead').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "qualified"
+            },
+            {
+              "fieldId": "qualified_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            },
+            {
+              "fieldId": "summary",
+              "fieldValue": "={{ $('Parser').item.json.resume }}"
+            },
+            {
+              "fieldId": "urgent",
+              "fieldValue": "={{ $('Parser').item.json.urgent }}"
+            },
+            {
+              "fieldId": "score",
+              "fieldValue": "={{ $('Parser').item.json.score }}"
+            },
+            {
+              "fieldId": "besoin_court",
+              "fieldValue": "={{ $('Parser').item.json.besoin_court }}"
+            },
+            {
+              "fieldId": "action",
+              "fieldValue": "={{ $('Parser').item.json.action }}"
+            },
+            {
+              "fieldId": "answers",
+              "fieldValue": "={{ $('Parser').item.json.answers }}"
+            },
+            {
+              "fieldId": "hubspot_contact_id",
+              "fieldValue": "={{ $('Create or update a contact').item.json.vid ?? $('Create or update a contact').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1472,
+        -192
+      ],
+      "id": "750b8017-4d3a-4766-b507-12ef5f0f3bbd",
+      "name": "Enregistrer qualifié",
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f88haHYeRHTtqrr",
+          "name": "Supabase · Lead Rescue"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Typebot": [
+      {
+        "json": {
+          "body": {
+            "t": "e2a00423da6c",
+            "besoin": "Fuite sous l'évier, la cuisine est inondée",
+            "urgence": "Oui, aujourd'hui",
+            "adresse": "12 rue des Remparts, 66000 Perpignan",
+            "dispo": "Avant 18h",
+            "email": "julien.morel@example.com",
+            "nom": "Morel"
+          }
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Typebot": {
+      "main": [
+        [
+          {
+            "node": "Charger le lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser": {
+      "main": [
+        [
+          {
+            "node": "Create or update a contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Push a message": {
+      "main": [
+        []
+      ]
+    },
+    "Create or update a contact": {
+      "main": [
+        [
+          {
+            "node": "Enregistrer qualifié",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Charger le lead": {
+      "main": [
+        [
+          {
+            "node": "Get client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get client": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enregistrer qualifié": {
+      "main": [
+        [
+          {
+            "node": "Push a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "aa8d459f-83f7-4419-ad4f-0468c5b4ed47",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "95f863dd510849d97617e236ae26391a8ec08dfe0fadc9b7de0f67840bc75e7a"
+  },
+  "nodeGroups": [],
+  "id": "tvHwuPwXqIZcknUa",
+  "tags": []
+}
