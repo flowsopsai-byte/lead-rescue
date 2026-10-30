@@ -65,7 +65,7 @@
       "type": "n8n-nodes-base.pushover",
       "typeVersion": 1,
       "position": [
-        1328,
+        1552,
         -240
       ],
       "id": "20d635a9-fa61-4c24-bd05-f96d052ddbc4",
@@ -85,7 +85,7 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        1552,
+        1776,
         -240
       ],
       "id": "48503fc3-c061-44e2-b021-dde3f11d2037",
@@ -130,7 +130,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        2000,
+        2224,
         -240
       ],
       "id": "2039f92a-3b8c-42c4-9dce-d3cc7750625a",
@@ -264,7 +264,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        880,
+        1104,
         -240
       ],
       "id": "41aeb842-6b16-4b1e-8e86-6f96b11d9daf",
@@ -292,7 +292,7 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        1776,
+        2000,
         -240
       ],
       "id": "8a39af7b-a676-47b5-a47c-c9a0a772f29f",
@@ -329,7 +329,7 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        2448,
+        2672,
         -240
       ],
       "id": "d7f5da16-f25d-480d-8715-8a70f1b5d82a",
@@ -359,7 +359,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        2224,
+        2448,
         -240
       ],
       "id": "697c3373-45e1-4ee7-8b1f-2d7d06a219b4",
@@ -400,7 +400,7 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        1104,
+        1328,
         -240
       ],
       "id": "dcdeffda-9dbf-4056-9585-c9c468a901e9",
@@ -411,6 +411,63 @@
           "name": "Supabase · Lead Rescue"
         }
       }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b1f0c2d3-1111-4a2b-9c3d-000000000001",
+              "leftValue": "={{ $('Préparer le lead').item.json.is_landline }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        880,
+        -240
+      ],
+      "id": "b1f0c2d3-1111-4a2b-9c3d-0000000000a1",
+      "name": "Fixe ?"
+    },
+    {
+      "parameters": {
+        "userKey": "YOUR_PUSHOVER_USER_KEY",
+        "message": "=☎️ Appel manqué depuis un FIXE — à rappeler\n{{ $('Get client').item.json.name }} · {{ $('Préparer le lead').item.json.caller_phone }}\n{{ new Date().toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' }) }}",
+        "priority": 1,
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.pushover",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        -440
+      ],
+      "id": "b1f0c2d3-1111-4a2b-9c3d-0000000000a2",
+      "name": "Notif fixe",
+      "credentials": {
+        "pushoverApi": {
+          "id": "TaxuGAC46IIY3wPT",
+          "name": "Pushover account"
+        }
+      }
     }
   ],
   "pinData": {
@@ -419,7 +476,7 @@
         "json": {
           "body": {
             "To": "+10000000000",
-            "From": "+33600000000",
+            "From": "+33468000000",
             "CallSid": "test-call-001",
             "CallStatus": "no-answer"
           }
@@ -520,7 +577,7 @@
       "main": [
         [
           {
-            "node": "Envoyer SMS",
+            "node": "Fixe ?",
             "type": "main",
             "index": 0
           }
@@ -565,6 +622,24 @@
         [
           {
             "node": "Lead Rescue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fixe ?": {
+      "main": [
+        [
+          {
+            "node": "Notif fixe",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Envoyer SMS",
             "type": "main",
             "index": 0
           }
