@@ -131,3 +131,9 @@ revoke update on public.clients from authenticated;
 grant update (sms_template, voice_message, voice_id, relance_enabled, avg_basket) on public.clients to authenticated;
 revoke update on public.calls from authenticated;
 grant update (status, called_back_at) on public.calls to authenticated;
+
+-- AI qualification fields (added with WF2)
+alter table public.calls
+  add column score smallint,
+  add column besoin_court text,
+  add column action text;
