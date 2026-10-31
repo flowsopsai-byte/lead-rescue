@@ -2,43 +2,35 @@
   "name": "Lead Rescue — WF3 Publish voice",
   "nodes": [
     {
-      "parameters": {},
-      "type": "n8n-nodes-base.manualTrigger",
-      "typeVersion": 1,
-      "position": [
-        0,
-        0
-      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-rescue-publish-voice",
+        "authentication": "headerAuth",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
       "id": "c3a00000-0000-4000-8000-000000000001",
-      "name": "When clicking ‘Execute workflow’"
+      "name": "Webhook",
+      "webhookId": "00000000-0000-0000-0000-000000000004",
+      "credentials": {
+        "httpHeaderAuth": { "id": "WEBHOOK_SECRET_CREDENTIAL", "name": "Lead Rescue · webhook secret" }
+      }
     },
     {
       "parameters": {
         "operation": "get",
         "tableId": "clients",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "id",
-              "keyValue": "00000000-0000-0000-0000-00000000c1e1"
-            }
-          ]
-        }
+        "filters": { "conditions": [ { "keyName": "id", "keyValue": "={{ $('Webhook').item.json.body.client_id }}" } ] }
       },
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
-      "position": [
-        224,
-        0
-      ],
+      "position": [224, 0],
       "id": "c3a00000-0000-4000-8000-000000000002",
       "name": "Get client",
-      "credentials": {
-        "supabaseApi": {
-          "id": "SUPABASE_CREDENTIAL",
-          "name": "Supabase · Lead Rescue"
-        }
-      }
+      "credentials": { "supabaseApi": { "id": "SUPABASE_CREDENTIAL", "name": "Supabase · Lead Rescue" } }
     },
     {
       "parameters": {
@@ -47,40 +39,18 @@
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Cartesia-Version",
-              "value": "2026-08-14"
-            }
-          ]
-        },
+        "headerParameters": { "parameters": [ { "name": "Cartesia-Version", "value": "2026-08-14" } ] },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"model_id\": \"sonic-3.6\",\n  \"transcript\": {{ JSON.stringify($json.voice_message.replaceAll('{entreprise}', $json.name)) }},\n  \"voice\": { \"mode\": \"id\", \"id\": \"{{ $json.voice_id || '7c58f4a4-a72c-42fa-a503-41b9408820f3' }}\" },\n  \"language\": \"fr\",\n  \"output_format\": { \"container\": \"mp3\", \"sample_rate\": 44100, \"bit_rate\": 128000 }\n}",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "file",
-              "outputPropertyName": "data"
-            }
-          }
-        }
+        "options": { "response": { "response": { "responseFormat": "file", "outputPropertyName": "data" } } }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
-      "position": [
-        448,
-        0
-      ],
+      "position": [448, 0],
       "id": "c3a00000-0000-4000-8000-000000000003",
       "name": "Cartesia TTS",
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "CARTESIA_CREDENTIAL",
-          "name": "Cartesia · TTS"
-        }
-      }
+      "credentials": { "httpHeaderAuth": { "id": "CARTESIA_CREDENTIAL", "name": "Cartesia · TTS" } }
     },
     {
       "parameters": {
@@ -91,10 +61,7 @@
       },
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
-      "position": [
-        672,
-        0
-      ],
+      "position": [672, 0],
       "id": "c3a00000-0000-4000-8000-000000000004",
       "name": "Read/Write Files from Disk"
     },
@@ -102,89 +69,24 @@
       "parameters": {
         "operation": "update",
         "tableId": "clients",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "id",
-              "condition": "eq",
-              "keyValue": "={{ $('Get client').item.json.id }}"
-            }
-          ]
-        },
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "audio_url",
-              "fieldValue": "=https://art.flowsopsai.com/audio/{{ $('Get client').item.json.id }}.mp3"
-            }
-          ]
-        }
+        "filters": { "conditions": [ { "keyName": "id", "condition": "eq", "keyValue": "={{ $('Get client').item.json.id }}" } ] },
+        "fieldsUi": { "fieldValues": [ { "fieldId": "audio_url", "fieldValue": "=https://art.flowsopsai.com/audio/{{ $('Get client').item.json.id }}.mp3" } ] }
       },
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
-      "position": [
-        896,
-        0
-      ],
+      "position": [896, 0],
       "id": "c3a00000-0000-4000-8000-000000000005",
       "name": "Enregistrer audio",
-      "credentials": {
-        "supabaseApi": {
-          "id": "SUPABASE_CREDENTIAL",
-          "name": "Supabase · Lead Rescue"
-        }
-      }
+      "credentials": { "supabaseApi": { "id": "SUPABASE_CREDENTIAL", "name": "Supabase · Lead Rescue" } }
     }
   ],
   "pinData": {},
   "connections": {
-    "When clicking ‘Execute workflow’": {
-      "main": [
-        [
-          {
-            "node": "Get client",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get client": {
-      "main": [
-        [
-          {
-            "node": "Cartesia TTS",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Cartesia TTS": {
-      "main": [
-        [
-          {
-            "node": "Read/Write Files from Disk",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Read/Write Files from Disk": {
-      "main": [
-        [
-          {
-            "node": "Enregistrer audio",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
+    "Webhook": { "main": [ [ { "node": "Get client", "type": "main", "index": 0 } ] ] },
+    "Get client": { "main": [ [ { "node": "Cartesia TTS", "type": "main", "index": 0 } ] ] },
+    "Cartesia TTS": { "main": [ [ { "node": "Read/Write Files from Disk", "type": "main", "index": 0 } ] ] },
+    "Read/Write Files from Disk": { "main": [ [ { "node": "Enregistrer audio", "type": "main", "index": 0 } ] ] }
   },
-  "settings": {
-    "executionOrder": "v1"
-  },
+  "settings": { "executionOrder": "v1" },
   "tags": []
 }
