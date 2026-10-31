@@ -137,3 +137,87 @@ alter table public.calls
   add column score smallint,
   add column besoin_court text,
   add column action text;
+
+-- ============================================
+-- v2: call outcomes, notes, morning briefings
+-- ============================================
+
+-- CALL OUTCOME (quote sent / won / lost)
+alter table public.calls
+  add column outcome text check (outcome in ('quote','won','lost')),
+  add column outcome_at timestamptz;
+
+revoke update on public.calls from authenticated;
+grant update (status, called_back_at, outcome, outcome_at) on public.calls to authenticated;
+
+-- Owner first name (used in the morning briefing greeting)
+alter table public.clients add column owner_first_name text;
+revoke update on public.clients from authenticated;
+grant update (sms_template, voice_message, voice_id, relance_enabled, avg_basket, owner_first_name)
+  on public.clients to authenticated;
+
+-- NOTES (voice or text, captured during the day)
+create table public.notes (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references public.clients(id) on delete cascade,
+  kind text not null check (kind in ('voice','text')),
+  body text,
+  audio_path text,
+  duration_s integer,
+  status text not null default 'ready' check (status in ('pending','ready','failed')),
+  category text check (category in ('call_back','order','todo','other')),
+  created_at timestamptz not null default now(),
+  briefed_at timestamptz
+);
+create index notes_client_date_idx on public.notes (client_id, created_at desc);
+
+alter table public.notes enable row level security;
+create policy "own notes read" on public.notes for select using (client_id in (select public.my_client_ids()));
+create policy "own notes insert" on public.notes for insert with check (client_id in (select public.my_client_ids()));
+create policy "own notes update" on public.notes for update using (client_id in (select public.my_client_ids()));
+create policy "own notes delete" on public.notes for delete using (client_id in (select public.my_client_ids()));
+
+-- MORNING BRIEFINGS (one per client per day)
+create table public.briefings (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references public.clients(id) on delete cascade,
+  briefing_date date not null,
+  summary text,
+  script text,
+  audio_url text,
+  stats jsonb not null default '{}'::jsonb,
+  priority_call_id uuid references public.calls(id) on delete set null,
+  created_at timestamptz not null default now(),
+  unique (client_id, briefing_date)
+);
+
+alter table public.briefings enable row level security;
+create policy "own briefings read" on public.briefings for select using (client_id in (select public.my_client_ids()));
+
+-- VOICE NOTE STORAGE (private bucket, one folder per client id)
+insert into storage.buckets (id, name, public)
+values ('voice-notes', 'voice-notes', false)
+on conflict (id) do nothing;
+
+create policy "voice notes upload" on storage.objects for insert to authenticated
+  with check (bucket_id = 'voice-notes'
+    and (storage.foldername(name))[1] in (select c::text from public.my_client_ids() c));
+create policy "voice notes read" on storage.objects for select to authenticated
+  using (bucket_id = 'voice-notes'
+    and (storage.foldername(name))[1] in (select c::text from public.my_client_ids() c));
+
+-- MONTHLY STATS v2: adds real revenue from won jobs
+create or replace view public.monthly_stats with (security_invoker = true) as
+select
+  c.client_id,
+  date_trunc('month', c.called_at) as month,
+  count(*) as missed_calls,
+  count(*) filter (where c.qualified_at is not null) as qualified,
+  count(*) filter (where c.status = 'called_back') as called_back,
+  round(avg(extract(epoch from (c.sms_sent_at - c.called_at)))) as avg_sms_delay_s,
+  count(*) filter (where c.status = 'called_back') * max(cl.avg_basket) as revenue_estimate,
+  count(*) filter (where c.outcome = 'won') as won_count,
+  count(*) filter (where c.outcome = 'won') * max(cl.avg_basket) as revenue_won
+from public.calls c
+join public.clients cl on cl.id = c.client_id
+group by c.client_id, date_trunc('month', c.called_at);
