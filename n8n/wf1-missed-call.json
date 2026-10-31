@@ -34,7 +34,7 @@
     {
       "parameters": {
         "respondWith": "text",
-        "responseBody": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response>\n  <Play>https://art.flowsopsai.com/audio/garage-dupont.mp3</Play>\n  <Hangup/>\n</Response>",
+        "responseBody": "=<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response>\n  <Play>{{ $('Get client').item.json.audio_url || 'https://art.flowsopsai.com/audio/garage-dupont.mp3' }}</Play>\n  <Hangup/>\n</Response>",
         "options": {
           "responseHeaders": {
             "entries": [
@@ -49,7 +49,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        -240,
+        -16,
         -240
       ],
       "id": "bb3130c5-dbb0-4ba3-9830-8f495a5b6e57",
@@ -153,7 +153,7 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        -16,
+        -240,
         -240
       ],
       "id": "aeb295ed-7681-4b89-a238-389db0bf2050",
@@ -500,7 +500,7 @@
       "main": [
         [
           {
-            "node": "Respond to Webhook",
+            "node": "Get client",
             "type": "main",
             "index": 0
           }
@@ -511,7 +511,7 @@
       "main": [
         [
           {
-            "node": "Get client",
+            "node": "Check doublon",
             "type": "main",
             "index": 0
           }
@@ -555,7 +555,7 @@
       "main": [
         [
           {
-            "node": "Check doublon",
+            "node": "Respond to Webhook",
             "type": "main",
             "index": 0
           }
