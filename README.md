@@ -43,6 +43,7 @@ flowchart LR
 | SMS | Brevo transactional SMS |
 | Qualification chat | Typebot |
 | AI summary & scoring | OpenAI GPT-4o via n8n AI Agent |
+| Client dashboard | Next.js + Tailwind on Vercel |
 | CRM | HubSpot |
 | Owner alerts | Pushover |
 
@@ -54,18 +55,30 @@ flowchart LR
 
 - **[`n8n/wf1-missed-call.json`](n8n/wf1-missed-call.json)** — missed call → client lookup → 24h dedup → landline detection → SMS → push alert → 1h wait → follow-up SMS.
 - **[`n8n/wf2-qualification.json`](n8n/wf2-qualification.json)** — chat answers → load call → AI summary & score → HubSpot → save qualification → push alert.
-- **[`n8n/wf3-publish-voice.json`](n8n/wf3-publish-voice.json)** — client greeting text → Cartesia Sonic TTS → MP3 stored on the server → `audio_url` saved; WF1 plays each client's own greeting.
+- **[`n8n/wf3-publish-voice.json`](n8n/wf3-publish-voice.json)** — triggered by the dashboard's **Publish** button (authenticated webhook): client greeting text → Cartesia Sonic TTS → MP3 stored on the server → `audio_url` saved; WF1 plays each client's own greeting.
 
 ### Data model
 
 **[`supabase/schema.sql`](supabase/schema.sql)** — one Supabase project serves every client:
 
 - `clients` — one row per business: rescue number, SMS template, voice message, follow-up setting, average job value.
-- `calls` — every missed call with its full lifecycle (`missed → sms_sent → qualified → called_back`), timestamps, chat answers, AI summary, score and CRM contact ID.
+- `calls` — every missed call with its full lifecycle (`missed → sms_sent → qualified → called_back`), timestamps, chat answers, AI summary, score, outcome and CRM contact ID.
 - `questions` — six configurable qualification slots per client.
-- `monthly_stats` — view powering the dashboard KPIs (missed calls, qualified leads, response time, estimated revenue recovered).
+- `notes` / `briefings` — voice and text notes captured during the day, and the morning briefing built from them.
+- `monthly_stats` — view powering the dashboard KPIs (missed calls, qualified leads, response time, revenue recovered).
 
 Row Level Security ensures each client only ever sees its own data. n8n writes with the service role; the client dashboard reads with user auth.
+
+## Client dashboard
+
+![Dashboard — missed calls](docs/screenshots/dashboard.png)
+
+**[`dashboard/`](dashboard/)** — Next.js 15 + Tailwind + Supabase Auth, deployed on Vercel. Each business logs in and only sees its own data.
+
+- **This morning** — daily audio briefing (Cartesia voice), the lead to call back first, yesterday's numbers, voice and text notes captured during the day
+- **Missed calls** — every call with its status, AI summary, chat answers, one-click CRM link, *called back* toggle and outcome (quote sent / won / lost) feeding a live "money saved" counter
+- **Voice greeting** — edit the greeting, SMS and follow-up; **Publish** regenerates the MP3 through WF3
+- **Questions** — six qualification slots: text, answer type, on/off, reorder
 
 ## Design choices
 
@@ -74,12 +87,14 @@ Row Level Security ensures each client only ever sees its own data. n8n writes w
 - **Landlines handled** — French landlines can't receive SMS, so the owner gets a "call back manually" alert instead of a wasted message.
 - **Factual AI** — the model is constrained to strict JSON and forbidden from inventing information or inflating urgency.
 - **Greeting pre-generated, not per call** — the MP3 is regenerated only when the text changes, so callers hear it instantly, it costs nothing per call, and calls are still answered if the TTS API is down.
-- **Secrets stay in n8n** — every API key lives in encrypted n8n credentials; exported workflows contain none.
+- **Secrets stay server-side** — API keys live in encrypted n8n credentials and Vercel environment variables; exported workflows and the repo contain none.
 
 ## Roadmap
 
-- [ ] Client dashboard — missed calls, chat answers, one-click CRM link, editable voice message and questions
 - [x] Voice greeting generated with **Cartesia Sonic** (French voices), regenerated on publish
+- [x] Client dashboard — missed calls, chat answers, one-click CRM link, outcomes, editable voice greeting and questions
+- [x] Voice and text notes captured from the dashboard
+- [ ] Voice note transcription (Cartesia STT) and 7 a.m. audio briefing workflow
 - [ ] Dynamic qualification questions read from Supabase
 - [ ] Weekly email report per client
 - [ ] Confirmation email to the prospect
@@ -87,9 +102,10 @@ Row Level Security ensures each client only ever sees its own data. n8n writes w
 ## Running it yourself
 
 1. Create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql).
-2. Import both workflows into n8n and attach your own credentials (Supabase, Brevo, OpenAI, HubSpot, Pushover).
+2. Import the three workflows into n8n and attach your own credentials (Supabase, Brevo, OpenAI, HubSpot, Pushover, Cartesia).
 3. Replace `YOUR_PUSHOVER_USER_KEY` and point your Telnyx number and Typebot webhook to the n8n production URLs.
-4. Insert a row in `clients` with your rescue number.
+4. Deploy [`dashboard/`](dashboard/) on Vercel with the variables from `dashboard/.env.local.example`.
+5. Insert a row in `clients` with your rescue number, then create a user and link it in `client_users`.
 
 ---
 
