@@ -51,7 +51,10 @@ export default function LoginPage() {
         </button>
         <div className="flex items-center gap-2 border-t border-line pt-4">
           <span className="rounded-[7px] bg-navy p-0.5"><FlowsOpsMark /></span>
-          <span className="text-xs text-muted">Propulsé par <span className="font-bold text-navy">FlowsOps AI</span></span>
+          <span className="flex flex-col leading-tight">
+            <span className="text-[11px] text-muted">Propulsé par</span>
+            <span className="bg-gradient-to-r from-[#2563EB] to-[#06B6D4] bg-clip-text text-sm font-extrabold whitespace-nowrap text-transparent">FlowsOps AI</span>
+          </span>
         </div>
       </form>
     </div>

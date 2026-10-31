@@ -13,4 +13,6 @@ npm run dev                         # http://localhost:3000
 ## Screens
 
 - `/appels` — missed calls, filters, AI summary, chat answers, CRM link, called-back, outcome (quote / won / lost) with "money saved" counter
-- `/matin`, `/message`, `/questions` — coming next
+- `/matin` — morning briefing (audio + summary), priority call-back, yesterday's stats, voice/text notes (voice notes stored in Supabase Storage, transcribed by n8n)
+- `/message` — edit voice greeting + SMS + follow-up; **Publish** regenerates the MP3 via n8n WF3 (Cartesia Sonic)
+- `/questions` — 6 qualification slots: text, answer type, on/off, reorder

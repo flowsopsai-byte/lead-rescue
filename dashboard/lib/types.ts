@@ -32,3 +32,45 @@ export type Client = {
   hubspot_portal_id: string | null;
   owner_first_name: string | null;
 };
+
+export type ClientSettings = {
+  id: string;
+  name: string;
+  sms_template: string;
+  voice_message: string;
+  voice_id: string | null;
+  audio_url: string | null;
+  relance_enabled: boolean;
+};
+
+export type AnswerType = "text" | "choice" | "address" | "slot" | "photo";
+
+export type Question = {
+  id: string;
+  position: number;
+  text: string;
+  answer_type: AnswerType;
+  choices: string;
+  active: boolean;
+};
+
+export type Note = {
+  id: string;
+  kind: "voice" | "text";
+  body: string | null;
+  audio_path: string | null;
+  duration_s: number | null;
+  status: "pending" | "ready" | "failed";
+  category: "call_back" | "order" | "todo" | "other" | null;
+  created_at: string;
+};
+
+export type Briefing = {
+  id: string;
+  briefing_date: string;
+  summary: string | null;
+  script: string | null;
+  audio_url: string | null;
+  stats: Record<string, number>;
+  priority_call_id: string | null;
+};

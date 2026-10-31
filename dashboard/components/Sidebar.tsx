@@ -96,8 +96,9 @@ export default function Sidebar({ clientName, rescueNumber, todoCount }: { clien
         </button>
         <div className="flex items-center gap-2 border-t border-navy-2 px-2 pt-3">
           <FlowsOpsMark />
-          <span className="text-xs text-[#94A3B8]">
-            Propulsé par <span className="font-bold text-[#CBD5E1]">FlowsOps AI</span>
+          <span className="flex flex-col leading-tight">
+            <span className="text-[11px] text-[#94A3B8]">Propulsé par</span>
+            <span className="bg-gradient-to-r from-[#3B82F6] to-[#22D3EE] bg-clip-text text-sm font-extrabold whitespace-nowrap text-transparent">FlowsOps AI</span>
           </span>
         </div>
       </div>
