@@ -26,7 +26,7 @@ flowchart LR
 ```
 
 1. **Call forwarding** — the business keeps its number; unanswered calls are forwarded (conditional forwarding) to a Lead Rescue line.
-2. **Instant response** — the caller hears a short voice message and receives an SMS within seconds.
+2. **Instant response** — the caller hears the business's own voice greeting (generated with Cartesia Sonic) and receives an SMS within seconds.
 3. **Qualification chat** — a mobile chat asks what the job is, how urgent, where, and when to call back.
 4. **AI summary** — an LLM turns the answers into a 3-line brief, an urgency level, a 1–5 lead score and a recommended next action.
 5. **Delivery** — the owner gets a push notification (flagged 🔴 if urgent) and a CRM contact is created or updated.
@@ -36,7 +36,8 @@ flowchart LR
 
 | Layer | Tool |
 |---|---|
-| Telephony & voice greeting | Telnyx (TeXML) |
+| Telephony | Telnyx (TeXML) |
+| Voice greeting (TTS) | Cartesia Sonic 3.6 — French voice, generated per client |
 | Orchestration | n8n (self-hosted, Docker, Hetzner VPS) |
 | Database | Supabase (Postgres, multi-tenant with Row Level Security) |
 | SMS | Brevo transactional SMS |
@@ -49,9 +50,11 @@ flowchart LR
 
 ![WF1 — Missed call](docs/screenshots/Wf-1.png)
 ![WF2 — Qualification](docs/screenshots/Wf-2.png)
+![WF3 — Publish voice](docs/screenshots/Wf-3.png)
 
 - **[`n8n/wf1-missed-call.json`](n8n/wf1-missed-call.json)** — missed call → client lookup → 24h dedup → landline detection → SMS → push alert → 1h wait → follow-up SMS.
 - **[`n8n/wf2-qualification.json`](n8n/wf2-qualification.json)** — chat answers → load call → AI summary & score → HubSpot → save qualification → push alert.
+- **[`n8n/wf3-publish-voice.json`](n8n/wf3-publish-voice.json)** — client greeting text → Cartesia Sonic TTS → MP3 stored on the server → `audio_url` saved; WF1 plays each client's own greeting.
 
 ### Data model
 
@@ -70,12 +73,13 @@ Row Level Security ensures each client only ever sees its own data. n8n writes w
 - **No double-texting** — the same caller is only processed once per 24h.
 - **Landlines handled** — French landlines can't receive SMS, so the owner gets a "call back manually" alert instead of a wasted message.
 - **Factual AI** — the model is constrained to strict JSON and forbidden from inventing information or inflating urgency.
+- **Greeting pre-generated, not per call** — the MP3 is regenerated only when the text changes, so callers hear it instantly, it costs nothing per call, and calls are still answered if the TTS API is down.
 - **Secrets stay in n8n** — every API key lives in encrypted n8n credentials; exported workflows contain none.
 
 ## Roadmap
 
 - [ ] Client dashboard — missed calls, chat answers, one-click CRM link, editable voice message and questions
-- [ ] Voice greeting generated with **Cartesia Sonic** (French voices), regenerated on publish
+- [x] Voice greeting generated with **Cartesia Sonic** (French voices), regenerated on publish
 - [ ] Dynamic qualification questions read from Supabase
 - [ ] Weekly email report per client
 - [ ] Confirmation email to the prospect
