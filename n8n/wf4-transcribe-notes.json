@@ -1,0 +1,175 @@
+{
+  "name": "Lead Rescue — WF4 Transcribe notes",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-rescue-new-note",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "id": "c4a00000-0000-4000-8000-000000000001",
+      "name": "Webhook",
+      "webhookId": "00000000-0000-0000-0000-000000000005",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "WEBHOOK_SECRET_CREDENTIAL",
+          "name": "Lead Rescue · webhook secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "c4a10000-0000-4000-8000-000000000001",
+              "leftValue": "={{ $json.body.record.kind }}",
+              "rightValue": "voice",
+              "operator": { "type": "string", "operation": "equals" }
+            },
+            {
+              "id": "c4a10000-0000-4000-8000-000000000002",
+              "leftValue": "={{ $json.body.record.status }}",
+              "rightValue": "pending",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [224, 0],
+      "id": "c4a00000-0000-4000-8000-000000000002",
+      "name": "Note vocale ?"
+    },
+    {
+      "parameters": {
+        "url": "=https://YOUR_PROJECT.supabase.co/storage/v1/object/voice-notes/{{ $json.body.record.audio_path }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "response": {
+            "response": { "responseFormat": "file", "outputPropertyName": "data" }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [448, -16],
+      "id": "c4a00000-0000-4000-8000-000000000003",
+      "name": "Télécharger audio",
+      "credentials": {
+        "supabaseApi": {
+          "id": "SUPABASE_CREDENTIAL",
+          "name": "Supabase · Lead Rescue"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/data/audio/note-{{ $('Webhook').first().json.body.record.id }}.webm",
+        "dataPropertyName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [672, -16],
+      "id": "c4a00000-0000-4000-8000-000000000004",
+      "name": "Écrire audio"
+    },
+    {
+      "parameters": {
+        "command": "=node -e \"const fs=require('fs');const p=process.argv[1];const f=new FormData();f.append('model','ink-whisper');f.append('language','fr');f.append('file',new Blob([fs.readFileSync(p)]),'note.webm');fetch('https://api.cartesia.ai/stt',{method:'POST',headers:{'Authorization':'Bearer '+process.env.CARTESIA_API_KEY,'Cartesia-Version':'2026-08-14'},body:f}).then(r=>r.text()).then(t=>{fs.unlinkSync(p);console.log(t)})\" /data/audio/note-{{ $('Webhook').first().json.body.record.id }}.webm"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [896, -16],
+      "id": "c4a00000-0000-4000-8000-000000000005",
+      "name": "Cartesia STT"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.parse($json.stdout).text }}",
+        "options": {
+          "systemMessage": "Tu classes une note vocale d'artisan. Réponds par UN SEUL mot, sans ponctuation, parmi :\ncall_back (rappeler quelqu'un)\norder (commander du matériel)\ntodo (tâche à faire)\nother (tout le reste)"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [1120, -16],
+      "id": "c4a00000-0000-4000-8000-000000000006",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": { "__rl": true, "mode": "list", "value": "gpt-4o-mini" },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [1120, 200],
+      "id": "c4a00000-0000-4000-8000-000000000007",
+      "name": "Classer",
+      "credentials": {
+        "openAiApi": {
+          "id": "OPENAI_CREDENTIAL",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "notes",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Webhook').first().json.body.record.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "body", "fieldValue": "={{ JSON.parse($('Cartesia STT').first().json.stdout).text }}" },
+            { "fieldId": "category", "fieldValue": "={{ $json.output.trim().toLowerCase() }}" },
+            { "fieldId": "status", "fieldValue": "ready" }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1440, -16],
+      "id": "c4a00000-0000-4000-8000-000000000008",
+      "name": "Enregistrer note",
+      "credentials": {
+        "supabaseApi": {
+          "id": "SUPABASE_CREDENTIAL",
+          "name": "Supabase · Lead Rescue"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Note vocale ?", "type": "main", "index": 0 }]] },
+    "Note vocale ?": { "main": [[{ "node": "Télécharger audio", "type": "main", "index": 0 }], []] },
+    "Télécharger audio": { "main": [[{ "node": "Écrire audio", "type": "main", "index": 0 }]] },
+    "Écrire audio": { "main": [[{ "node": "Cartesia STT", "type": "main", "index": 0 }]] },
+    "Cartesia STT": { "main": [[{ "node": "AI Agent", "type": "main", "index": 0 }]] },
+    "Classer": { "ai_languageModel": [[{ "node": "AI Agent", "type": "ai_languageModel", "index": 0 }]] },
+    "AI Agent": { "main": [[{ "node": "Enregistrer note", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": []
+}
