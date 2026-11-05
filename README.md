@@ -26,6 +26,8 @@ flowchart LR
     G --> K[(Client dashboard)]
     N[Voice note from the owner] --> T[Cartesia Ink transcription<br/>+ AI category]
     T --> K
+    K -- Every day 7 a.m. --> W[Audio briefing<br/>AI script + Cartesia voice]
+    W --> K
     K -- Publish greeting --> P[New MP3 via Cartesia] --> B
 ```
 
@@ -77,11 +79,13 @@ On the last answer, Typebot posts everything to WF2, which writes the AI summary
 ![WF2 — Qualification](docs/screenshots/Wf-2.png)
 ![WF3 — Publish voice](docs/screenshots/Wf-3.png)
 ![WF4 — Transcribe notes](docs/screenshots/Wf-4.png)
+![WF5 — Morning briefing](docs/screenshots/Wf-5.png)
 
 - **[`n8n/wf1-missed-call.json`](n8n/wf1-missed-call.json)** — missed call → client lookup → 24h dedup → landline detection → SMS → push alert → 1h wait → follow-up SMS.
 - **[`n8n/wf2-qualification.json`](n8n/wf2-qualification.json)** — chat answers → load call → AI summary & score → HubSpot → save qualification → push alert.
 - **[`n8n/wf3-publish-voice.json`](n8n/wf3-publish-voice.json)** — triggered by the dashboard's **Publish** button (authenticated webhook): client greeting text → Cartesia Sonic TTS → MP3 stored on the server → `audio_url` saved; WF1 plays each client's own greeting.
 - **[`n8n/wf4-transcribe-notes.json`](n8n/wf4-transcribe-notes.json)** — triggered by a Supabase Database Webhook on every new note: voice note downloaded from private storage → Cartesia Ink Whisper transcription → AI category (call back / order / to-do / other) → note marked ready in the dashboard.
+- **[`n8n/wf5-morning-briefing.json`](n8n/wf5-morning-briefing.json)** — every day at 7 a.m. (Paris time), for each client: yesterday's missed calls + unread notes → priority call picked (urgent first, then score) → AI writes an on-screen summary and a 60-word spoken script → Cartesia Sonic MP3 in the owner's chosen voice → briefing saved (idempotent upsert) → notes marked as briefed → push notification.
 
 ### Data model
 
@@ -116,6 +120,7 @@ Row Level Security ensures each client only ever sees its own data. n8n writes w
 - **Greeting pre-generated, not per call** — the MP3 is regenerated only when the text changes, so callers hear it instantly, it costs nothing per call, and calls are still answered if the TTS API is down.
 - **Event-driven notes** — a Supabase Database Webhook pushes each new note to n8n the moment it's saved; no polling.
 - **STT through a plain HTTP client** — n8n's HTTP node doesn't produce a multipart upload Cartesia accepts, so WF4 sends the audio with Node's native `fetch` + `FormData` from an Execute Command node; the API key is read from the container environment, never stored in the workflow.
+- **A briefing, not a report** — the morning summary is written to be *heard*, in under 30 seconds, by someone driving to a job site; the AI is given a strict structure and forbidden from inventing anything.
 - **Secrets stay in n8n** — every API key lives in encrypted n8n credentials; exported workflows contain none.
 
 ## Roadmap
@@ -123,7 +128,7 @@ Row Level Security ensures each client only ever sees its own data. n8n writes w
 - [x] Client dashboard — missed calls, chat answers, one-click CRM link, outcomes, editable voice greeting and questions
 - [x] Voice and text notes captured from the dashboard
 - [x] Voice note transcription (Cartesia Ink Whisper) and automatic categorisation
-- [ ] 7 a.m. audio briefing workflow
+- [x] 7 a.m. audio briefing in the business's own voice
 - [x] Voice greeting generated with **Cartesia Sonic** (French voices), regenerated on publish
 - [ ] Dynamic qualification questions read from Supabase
 - [ ] Weekly email report per client
