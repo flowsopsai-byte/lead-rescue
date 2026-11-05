@@ -1,5 +1,7 @@
 # Lead Rescue
 
+🇫🇷 [Lire en français](README.fr.md)
+
 **Missed-call recovery for local businesses.** When a tradesperson can't pick up, Lead Rescue answers in under 30 seconds: the caller gets an SMS with a short AI qualification chat, and the business owner gets a ready-to-call summary on their phone and in their CRM.
 
 Built and operated by [Thomas Plasseraud](https://www.linkedin.com/in/thomas-plasseraud) · FlowsOps AI.
@@ -144,4 +146,4 @@ Row Level Security ensures each client only ever sees its own data. n8n writes w
 
 ---
 
-© FlowsOps AI. All rights reserved.
+© FlowsOps AI. All rights reserved. See [LICENSE](LICENSE).
