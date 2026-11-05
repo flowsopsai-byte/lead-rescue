@@ -1,0 +1,211 @@
+{
+  "name": "Lead Rescue — WF5 Morning briefing",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "days", "triggerAtHour": 7 }] } },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "id": "c5a00000-0000-4000-8000-000000000001",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": { "operation": "getAll", "tableId": "clients", "returnAll": true },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [224, 0],
+      "id": "c5a00000-0000-4000-8000-000000000002",
+      "name": "Clients",
+      "credentials": { "supabaseApi": { "id": "SUPABASE_CREDENTIAL", "name": "Supabase · Lead Rescue" } }
+    },
+    {
+      "parameters": { "options": {} },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [448, 0],
+      "id": "c5a00000-0000-4000-8000-000000000003",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "calls",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "=client_id=eq.{{ $('Loop Over Items').item.json.id }}&called_at=gte.{{ $now.minus({days:1}).startOf('day').toUTC().toISO() }}&called_at=lt.{{ $now.startOf('day').toUTC().toISO() }}"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [672, -96],
+      "id": "c5a00000-0000-4000-8000-000000000004",
+      "name": "Appels d'hier",
+      "alwaysOutputData": true,
+      "credentials": { "supabaseApi": { "id": "SUPABASE_CREDENTIAL", "name": "Supabase · Lead Rescue" } }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "notes",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "=client_id=eq.{{ $('Loop Over Items').item.json.id }}&status=eq.ready&briefed_at=is.null"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [896, -96],
+      "id": "c5a00000-0000-4000-8000-000000000005",
+      "name": "Notes à résumer",
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": { "supabaseApi": { "id": "SUPABASE_CREDENTIAL", "name": "Supabase · Lead Rescue" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const client = $('Loop Over Items').first().json;\nconst calls = $(\"Appels d'hier\").all().map(i => i.json).filter(c => c.id);\nconst notes = $('Notes à résumer').all().map(i => i.json).filter(n => n.id);\n\nconst qualified = calls.filter(c => ['qualified', 'called_back'].includes(c.status));\nconst urgent = calls.filter(c => c.urgent);\nconst landlines = calls.filter(c => c.is_landline);\n\nconst priority = calls\n  .filter(c => c.status !== 'called_back')\n  .sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0) || (b.score || 0) - (a.score || 0))[0] || null;\n\nconst labels = { call_back: 'À rappeler', order: 'À commander', todo: 'À faire', other: 'Divers' };\n\nconst lines = [];\nlines.push(`Artisan : ${client.owner_first_name || ''} (${client.name})`);\nlines.push(`Hier : ${calls.length} appel(s) manqué(s), ${qualified.length} qualifié(s), ${urgent.length} urgent(s), ${landlines.length} fixe(s) à rappeler.`);\nif (priority) {\n  lines.push(`Appel prioritaire : ${priority.besoin_court || 'besoin non précisé'}${priority.urgent ? ' (URGENT)' : ''}. ${priority.summary || ''}`);\n}\nif (notes.length) {\n  lines.push(\"Notes de l'artisan :\");\n  for (const n of notes) lines.push(`- [${labels[n.category] || 'Divers'}] ${n.body}`);\n}\n\nreturn [{\n  json: {\n    client_id: client.id,\n    voice_id: client.voice_id,\n    date: $now.toFormat('yyyy-MM-dd'),\n    priority_call_id: priority ? priority.id : null,\n    stats: { missed: calls.length, qualified: qualified.length, urgent: urgent.length, landline: landlines.length, notes: notes.length },\n    context: lines.join('\\n'),\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, -96],
+      "id": "c5a00000-0000-4000-8000-000000000006",
+      "name": "Préparer briefing"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.context }}",
+        "options": {
+          "systemMessage": "Tu es l'assistante d'un artisan et tu lui fais son briefing du matin à l'oral.\nRéponds UNIQUEMENT en JSON valide, sans texte autour :\n{\"summary\": \"...\", \"script\": \"...\"}\n\nsummary : 2 à 3 phrases écrites et factuelles pour l'écran.\n\nscript : 60 mots maximum, phrases courtes, ton naturel et chaleureux, tutoiement.\nStructure :\n1. \"Bonjour\" + prénom, puis le bilan d'hier en une phrase (nombre d'appels manqués, dont combien urgents).\n2. L'appel à rappeler en premier : le besoin du client, où il est, quand il est joignable. C'est le CLIENT qui est disponible, pas l'artisan.\n3. Les autres appels en une phrase courte s'il y en a.\n4. Les notes de l'artisan, reformulées simplement (\"pense à commander...\", \"n'oublie pas de...\").\n5. \"Bonne journée !\"\nS'il n'y a ni appel ni note, dis-le simplement en une phrase.\nN'invente aucune information."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [1344, -96],
+      "id": "c5a00000-0000-4000-8000-000000000007",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": { "model": { "__rl": true, "mode": "list", "value": "gpt-4o-mini" }, "options": {} },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [1344, 112],
+      "id": "c5a00000-0000-4000-8000-000000000008",
+      "name": "OpenAI Chat Model",
+      "credentials": { "openAiApi": { "id": "OPENAI_CREDENTIAL", "name": "OpenAI account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.output.replace(/```json|```/g, '').trim();\nconst ai = JSON.parse(raw);\nconst p = $('Préparer briefing').first().json;\nreturn [{ json: { ...p, summary: ai.summary, script: ai.script } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1664, -96],
+      "id": "c5a00000-0000-4000-8000-000000000009",
+      "name": "Parser"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.cartesia.ai/tts/bytes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Cartesia-Version", "value": "2026-08-14" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model_id\": \"sonic-3.6\",\n  \"transcript\": {{ JSON.stringify($json.script) }},\n  \"voice\": { \"mode\": \"id\", \"id\": \"{{ $json.voice_id || '7c58f4a4-a72c-42fa-a503-41b9408820f3' }}\" },\n  \"language\": \"fr\",\n  \"output_format\": { \"container\": \"mp3\", \"sample_rate\": 44100, \"bit_rate\": 128000 }\n}",
+        "options": { "response": { "response": { "responseFormat": "file", "outputPropertyName": "data" } } }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1888, -96],
+      "id": "c5a00000-0000-4000-8000-000000000010",
+      "name": "Cartesia TTS",
+      "credentials": { "httpHeaderAuth": { "id": "CARTESIA_CREDENTIAL", "name": "Cartesia · TTS" } }
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/data/public-audio/briefing-{{ $('Parser').first().json.client_id }}-{{ $('Parser').first().json.date }}.mp3",
+        "dataPropertyName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [2112, -96],
+      "id": "c5a00000-0000-4000-8000-000000000011",
+      "name": "Écrire MP3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR_PROJECT.supabase.co/rest/v1/briefings?on_conflict=client_id,briefing_date",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Prefer", "value": "resolution=merge-duplicates,return=minimal" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"client_id\": \"{{ $('Parser').first().json.client_id }}\",\n  \"briefing_date\": \"{{ $('Parser').first().json.date }}\",\n  \"summary\": {{ JSON.stringify($('Parser').first().json.summary) }},\n  \"script\": {{ JSON.stringify($('Parser').first().json.script) }},\n  \"audio_url\": \"https://YOUR_AUDIO_HOST/audio/briefing-{{ $('Parser').first().json.client_id }}-{{ $('Parser').first().json.date }}.mp3\",\n  \"stats\": {{ JSON.stringify($('Parser').first().json.stats) }},\n  \"priority_call_id\": {{ JSON.stringify($('Parser').first().json.priority_call_id) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [2336, -96],
+      "id": "c5a00000-0000-4000-8000-000000000012",
+      "name": "Enregistrer briefing",
+      "credentials": { "supabaseApi": { "id": "SUPABASE_CREDENTIAL", "name": "Supabase · Lead Rescue" } }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://YOUR_PROJECT.supabase.co/rest/v1/notes?client_id=eq.{{ $('Parser').first().json.client_id }}&status=eq.ready&briefed_at=is.null",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Prefer", "value": "return=minimal" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"briefed_at\": \"{{ $now.toUTC().toISO() }}\" }",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [2560, -96],
+      "id": "c5a00000-0000-4000-8000-000000000013",
+      "name": "Notes résumées",
+      "credentials": { "supabaseApi": { "id": "SUPABASE_CREDENTIAL", "name": "Supabase · Lead Rescue" } }
+    },
+    {
+      "parameters": {
+        "userKey": "YOUR_PUSHOVER_USER_KEY",
+        "message": "={{ $('Parser').first().json.summary }}",
+        "additionalFields": { "title": "☀️ Votre briefing du matin" }
+      },
+      "type": "n8n-nodes-base.pushover",
+      "typeVersion": 1,
+      "position": [2784, -96],
+      "id": "c5a00000-0000-4000-8000-000000000014",
+      "name": "Notif briefing",
+      "credentials": { "pushoverApi": { "id": "PUSHOVER_CREDENTIAL", "name": "Pushover account" } }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": { "main": [[{ "node": "Clients", "type": "main", "index": 0 }]] },
+    "Clients": { "main": [[{ "node": "Loop Over Items", "type": "main", "index": 0 }]] },
+    "Loop Over Items": { "main": [[], [{ "node": "Appels d'hier", "type": "main", "index": 0 }]] },
+    "Appels d'hier": { "main": [[{ "node": "Notes à résumer", "type": "main", "index": 0 }]] },
+    "Notes à résumer": { "main": [[{ "node": "Préparer briefing", "type": "main", "index": 0 }]] },
+    "Préparer briefing": { "main": [[{ "node": "AI Agent", "type": "main", "index": 0 }]] },
+    "OpenAI Chat Model": { "ai_languageModel": [[{ "node": "AI Agent", "type": "ai_languageModel", "index": 0 }]] },
+    "AI Agent": { "main": [[{ "node": "Parser", "type": "main", "index": 0 }]] },
+    "Parser": { "main": [[{ "node": "Cartesia TTS", "type": "main", "index": 0 }]] },
+    "Cartesia TTS": { "main": [[{ "node": "Écrire MP3", "type": "main", "index": 0 }]] },
+    "Écrire MP3": { "main": [[{ "node": "Enregistrer briefing", "type": "main", "index": 0 }]] },
+    "Enregistrer briefing": { "main": [[{ "node": "Notes résumées", "type": "main", "index": 0 }]] },
+    "Notes résumées": { "main": [[{ "node": "Notif briefing", "type": "main", "index": 0 }]] },
+    "Notif briefing": { "main": [[{ "node": "Loop Over Items", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1", "timezone": "Europe/Paris" },
+  "tags": []
+}
