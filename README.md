@@ -14,15 +14,19 @@ Plumbers, landscapers, roofers and garages miss calls all day because they're on
 
 ```mermaid
 flowchart LR
-    A[Missed call] --> B[Voice greeting]
+    A[Missed call] --> B[Business voice greeting<br/>Cartesia Sonic]
     B --> C{Mobile or landline?}
-    C -- Mobile --> D[SMS with chat link]
     C -- Landline --> E[Push alert: call back manually]
-    D --> F[AI qualification chat]
+    C -- Mobile --> D[SMS with chat link]
+    D -- No reply after 1h --> J[Follow-up SMS]
+    D --> F[Qualification chat<br/>Typebot]
     F --> G[AI summary + score 1-5]
     G --> H[CRM contact]
     G --> I[Push alert to owner]
-    D -- No reply after 1h --> J[Follow-up SMS]
+    G --> K[(Client dashboard)]
+    N[Voice note from the owner] --> T[Cartesia Ink transcription<br/>+ AI category]
+    T --> K
+    K -- Publish greeting --> P[New MP3 via Cartesia] --> B
 ```
 
 1. **Call forwarding** — the business keeps its number; unanswered calls are forwarded (conditional forwarding) to a Lead Rescue line.
@@ -50,12 +54,16 @@ flowchart LR
 
 ### Qualification chat
 
-![Typebot — qualification flow](docs/screenshots/typebot-flow.png)
+<p>
+  <img src="docs/screenshots/typebot-chat.png" alt="Typebot — what the caller sees" width="32%">
+  &nbsp;
+  <img src="docs/screenshots/typebot-flow.png" alt="Typebot — qualification flow" width="64%">
+</p>
 
 The SMS links to a mobile chat built with **Typebot**. The call's unique token travels in the URL (`?t=…`), so every answer is tied to the right missed call without asking the caller to identify themselves again.
 
-1. **Need** — what's the job, in a few words
-2. **Name**
+1. **Name**
+2. **Need** — what's the job, in a few words
 3. **Urgency** — today / this week / no rush (one tap)
 4. **Location** — town or postcode
 5. **Best time to call back**
