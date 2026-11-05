@@ -132,7 +132,7 @@ Row Level Security ensures each client only ever sees its own data. n8n writes w
 - [x] Voice greeting generated with **Cartesia Sonic** (French voices), regenerated on publish
 - [ ] Dynamic qualification questions read from Supabase
 - [ ] Weekly email report per client
-- [ ] Confirmation email to the prospect
+- [ ] 90-day follow-up email with referral offer (consent-based, sent through Brevo)
 
 ## Running it yourself
 
