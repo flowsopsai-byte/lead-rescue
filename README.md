@@ -42,11 +42,26 @@ flowchart LR
 | Orchestration | n8n (self-hosted, Docker, Hetzner VPS) |
 | Database | Supabase (Postgres, multi-tenant with Row Level Security) |
 | SMS | Brevo transactional SMS |
-| Qualification chat | Typebot |
+| Qualification chat | Typebot (token-linked to each call) |
 | AI summary & scoring | OpenAI GPT-4o via n8n AI Agent |
 | Client dashboard | Next.js + Tailwind on Vercel |
 | CRM | HubSpot |
 | Owner alerts | Pushover |
+
+### Qualification chat
+
+![Typebot — qualification flow](docs/screenshots/typebot-flow.png)
+
+The SMS links to a mobile chat built with **Typebot**. The call's unique token travels in the URL (`?t=…`), so every answer is tied to the right missed call without asking the caller to identify themselves again.
+
+1. **Need** — what's the job, in a few words
+2. **Name**
+3. **Urgency** — today / this week / no rush (one tap)
+4. **Location** — town or postcode
+5. **Best time to call back**
+6. **Email** (optional)
+
+On the last answer, Typebot posts everything to WF2, which writes the AI summary, scores the lead and alerts the owner. The caller gets an instant "we'll call you back" confirmation.
 
 ### Workflows
 
