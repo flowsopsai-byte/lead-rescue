@@ -1,3 +1,4 @@
+import FloatingNoteButton from "@/components/FloatingNoteButton";
 import Sidebar from "@/components/Sidebar";
 import { createClient } from "@/lib/supabase/server";
 
@@ -12,7 +13,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen flex-wrap">
       <Sidebar clientName={client?.name ?? "Mon entreprise"} rescueNumber={client?.rescue_number ?? null} todoCount={count ?? 0} />
-      <main className="min-w-0 flex-[999_1_560px] px-5 py-8 sm:px-10">{children}</main>
+      <main className="min-w-0 flex-[999_1_560px] px-5 py-8 pb-28 sm:px-10">{children}</main>
+      {client && <FloatingNoteButton clientId={client.id} />}
     </div>
   );
 }

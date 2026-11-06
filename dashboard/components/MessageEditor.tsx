@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { ClientSettings } from "@/lib/types";
+import VoicePlayer from "@/components/VoicePlayer";
 
 const VOICES = [{ id: "7c58f4a4-a72c-42fa-a503-41b9408820f3", label: "Inès · posée, professionnelle" }];
 const DEFAULT_VOICE = VOICES[0].id;
@@ -16,7 +17,6 @@ export default function MessageEditor({ initial }: { initial: ClientSettings }) 
   const [relance, setRelance] = useState(initial.relance_enabled);
   const [state, setState] = useState<"idle" | "saving" | "publishing" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
 
   const voiceChanged = msg !== saved.voice_message || voice !== (saved.voice_id || DEFAULT_VOICE);
   const dirty = voiceChanged || sms !== saved.sms_template || relance !== saved.relance_enabled;
@@ -67,14 +67,22 @@ export default function MessageEditor({ initial }: { initial: ClientSettings }) 
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <span className={`text-[13px] font-semibold ${dirty ? "text-brand-dark" : "text-muted"}`}>{statusText}</span>
-          <button
-            type="button"
-            onClick={publish}
-            disabled={!dirty || state === "saving" || state === "publishing"}
-            className="min-h-11 rounded-lg bg-brand px-5 text-sm font-extrabold text-white hover:bg-brand-dark disabled:bg-line disabled:text-muted"
-          >
-            Publier
-          </button>
+          {(() => {
+            const busy = state === "saving" || state === "publishing";
+            const published = state === "done" && !dirty;
+            const color = published ? "bg-[#15803D] text-white" : dirty || busy ? "bg-brand text-white hover:bg-brand-dark" : "bg-line text-muted";
+            return (
+              <button
+                type="button"
+                onClick={publish}
+                disabled={!dirty || busy}
+                className={`inline-flex min-h-11 min-w-[9.5rem] items-center justify-center gap-2 rounded-lg px-5 text-sm font-extrabold transition-colors ${color}`}
+              >
+                {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />}
+                {state === "saving" ? "Enregistrement…" : state === "publishing" ? "Génération…" : published ? "✓ Publié" : "Publier"}
+              </button>
+            );
+          })()}
         </div>
       </div>
       {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-urgent">{error}</p>}
@@ -101,19 +109,13 @@ export default function MessageEditor({ initial }: { initial: ClientSettings }) 
                   ))}
                 </select>
               </label>
-              <div className="flex items-center gap-3">
-                <span className="font-mono text-[13px] text-muted">≈ {secs} s</span>
-                <button
-                  type="button"
-                  disabled={!saved.audio_url}
-                  onClick={() => audioRef.current?.play()}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line-2 bg-white px-4 text-sm font-bold disabled:opacity-40"
-                >
-                  ▶ Écouter la version publiée
-                </button>
-                {saved.audio_url && <audio ref={audioRef} src={saved.audio_url} preload="none" />}
-              </div>
+              <span className="font-mono text-[13px] text-muted">≈ {secs} s</span>
             </div>
+            {saved.audio_url ? (
+              <VoicePlayer src={saved.audio_url} />
+            ) : (
+              <p className="rounded-xl border border-dashed border-line-2 px-4 py-3 text-[13px] text-muted">Aucune version publiée pour l&apos;instant. Cliquez sur Publier pour générer la voix.</p>
+            )}
           </section>
 
           <section className="flex flex-col gap-4 rounded-xl border border-line bg-white p-6">

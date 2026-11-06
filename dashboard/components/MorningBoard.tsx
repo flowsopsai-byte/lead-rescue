@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Briefing, Call, Note } from "@/lib/types";
 
@@ -51,6 +51,12 @@ export default function MorningBoard({
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const startedAt = useRef(0);
+
+  useEffect(() => {
+    const onNote = (e: Event) => setNotes((ns) => [(e as CustomEvent<Note>).detail, ...ns]);
+    window.addEventListener("lr:note", onNote);
+    return () => window.removeEventListener("lr:note", onNote);
+  }, []);
 
   const today = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 
